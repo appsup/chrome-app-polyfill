@@ -100,6 +100,7 @@ Polymer({
     matchedDevices: {
       type: Array,
       computed: "computeMatchedDevices(devices, devices.*)",
+      observer: '_matchedDevicesChanged',
     },
     origin: String,
     scanning: Boolean,
@@ -107,6 +108,10 @@ Polymer({
       type: Object,
       value: null,
     },
+    silent: {
+      type: Boolean,
+      value: false
+    }
   },
   created: function() {
     var self = this;
@@ -188,6 +193,17 @@ Polymer({
     this.$.deviceSelector.selectNext();
   },
 
+  _matchedDevicesChanged: function(devices) {
+    if (this.silent&&devices.length) {
+      console.log("matched devices changed",devices);
+      var device = devices[0];
+      this.rejectOnClose = false;
+      this.requestDeviceInfo.resolve(device.device);
+      self.scanning = false;
+      this.dialogClosed();
+    }
+  },
+
   requestDevice: function(requestDeviceInfo) {
     var self = this;
     self.requestDeviceInfo = requestDeviceInfo;
@@ -195,7 +211,9 @@ Polymer({
     self.devices = [];
     self.origin = self.requestDeviceInfo.originName;
     self.scanning = true;
-    self.$.deviceSelectorDialog.open();
+    if (!self.silent) {
+      self.$.deviceSelectorDialog.open();
+    }
 
     chrome.bluetooth.getDevices(function(devices) {
       self.devices = devices.map(function(btDevice) {
@@ -216,11 +234,17 @@ Polymer({
         if (chrome.runtime.lastError) {
           console.error(chrome.runtime.lastError.message);
           self.scanning = false;
+          if (self.silent) {
+            self.dialogClosed();
+          }
           return;
         }
         var T_GAP_gen_disc_scan_min = 10240;  // 10.24 seconds
         self.stopScanningTimeout = setTimeout(function() {
           self.scanning = false;
+          if (self.silent) {
+            self.dialogClosed();
+          }
         }, T_GAP_gen_disc_scan_min);
       });
     });

@@ -869,6 +869,7 @@ navigator.bluetooth.requestDevice = function(requestDeviceOptions) {
     };
 
     requestDeviceDialog.addEventListener('iron-overlay-closed', dialogClosedListener);
+    requestDeviceDialog.silent = requestDeviceOptions.silent;
     requestDeviceDialog.requestDevice(requestDeviceInfo);
   });
 };
