@@ -158,6 +158,9 @@ Polymer({
 
   dialogClosed: function() {
     var self = this;
+    if (this.silent) {
+      this.fire("iron-overlay-closed")
+    }
     if (self.rejectOnClose) {
       var e = new Error('Cancelled');
       e.name = 'NotFoundError';
@@ -195,7 +198,6 @@ Polymer({
 
   _matchedDevicesChanged: function(devices) {
     if (this.silent&&devices.length) {
-      console.log("matched devices changed",devices);
       var device = devices[0];
       this.rejectOnClose = false;
       this.requestDeviceInfo.resolve(device.device);
