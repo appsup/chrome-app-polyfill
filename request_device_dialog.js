@@ -248,6 +248,8 @@ Polymer({
             self.dialogClosed();
           }
         }, T_GAP_gen_disc_scan_min);
+      }, {
+        disableNonLe: true
       });
     });
   }
