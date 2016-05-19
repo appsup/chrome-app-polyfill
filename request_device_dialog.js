@@ -44,11 +44,12 @@ function findDeviceIndexByAddress(arr, device) {
   return arr.findIndex(function(elem) { return elem.address === device.address });
 }
 
-function uuidsMatchFilters(serviceUuids, filters) {
+function matchFilters(device, filters) {
   return filters.some(function(filter) {
-    return filter.services.every(function(service) {
-      return serviceUuids.contains(service);
-    });
+    return (!filter.services||filter.services.every(function(service) {
+      return device.uuids.contains(service);
+    }))&&(!filter.name||filter.name===device.name)
+        &&(!filter.namePrefix||device.name.indexOf(filter.namePrefix)===0);
   });
 };
 
@@ -61,7 +62,8 @@ function DeviceView(bluetoothDevice, requestDeviceInfo) {
   self.address = self.device.address;
   self.updateFrom(bluetoothDevice);
   self.initialUuids = self.device.uuids || [];
-  self.matchesFilters = uuidsMatchFilters(self.initialUuids, self.filters);
+  self.matchesFilters = matchFilters(self.device, self.filters);
+
 }
 
 DeviceView.prototype.updateFrom = function(sourceDevice) {
@@ -98,6 +100,7 @@ Polymer({
     matchedDevices: {
       type: Array,
       computed: "computeMatchedDevices(devices, devices.*)",
+      observer: '_matchedDevicesChanged',
     },
     origin: String,
     scanning: Boolean,
@@ -105,6 +108,10 @@ Polymer({
       type: Object,
       value: null,
     },
+    silent: {
+      type: Boolean,
+      value: false
+    }
   },
   created: function() {
     var self = this;
@@ -151,6 +158,9 @@ Polymer({
 
   dialogClosed: function() {
     var self = this;
+    if (this.silent) {
+      this.fire("iron-overlay-closed")
+    }
     if (self.rejectOnClose) {
       var e = new Error('Cancelled');
       e.name = 'NotFoundError';
@@ -186,6 +196,16 @@ Polymer({
     this.$.deviceSelector.selectNext();
   },
 
+  _matchedDevicesChanged: function(devices) {
+    if (this.silent&&devices.length) {
+      var device = devices[0];
+      this.rejectOnClose = false;
+      this.requestDeviceInfo.resolve(device.device);
+      self.scanning = false;
+      this.dialogClosed();
+    }
+  },
+
   requestDevice: function(requestDeviceInfo) {
     var self = this;
     self.requestDeviceInfo = requestDeviceInfo;
@@ -193,7 +213,9 @@ Polymer({
     self.devices = [];
     self.origin = self.requestDeviceInfo.originName;
     self.scanning = true;
-    self.$.deviceSelectorDialog.open();
+    if (!self.silent) {
+      self.$.deviceSelectorDialog.open();
+    }
 
     chrome.bluetooth.getDevices(function(devices) {
       self.devices = devices.map(function(btDevice) {
@@ -214,12 +236,20 @@ Polymer({
         if (chrome.runtime.lastError) {
           console.error(chrome.runtime.lastError.message);
           self.scanning = false;
+          if (self.silent) {
+            self.dialogClosed();
+          }
           return;
         }
         var T_GAP_gen_disc_scan_min = 10240;  // 10.24 seconds
         self.stopScanningTimeout = setTimeout(function() {
           self.scanning = false;
+          if (self.silent) {
+            self.dialogClosed();
+          }
         }, T_GAP_gen_disc_scan_min);
+      }, {
+        disableNonLe: true
       });
     });
   }
